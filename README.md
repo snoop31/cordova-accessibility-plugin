@@ -1,2 +1,2 @@
-# ionic-accessibility-plugin
-A custom accessibility plugin for Ionic 3
+# cordova-accessibility-plugin
+A custom accessibility plugin for Cordova
