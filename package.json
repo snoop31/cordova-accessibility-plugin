@@ -1,0 +1,11 @@
+{
+  "name": "cordova-accessibility-plugin",
+  "version": "1.0.0",
+  "cordova": {
+    "id": "cordova-accessibility-plugin",
+    "platforms": [
+      "android"
+    ]
+  },
+  "description": "A custom accessibility plugin for cordova"
+}
