@@ -1,7 +1,7 @@
 
 var exec = require('cordova/exec');
 
-var PLUGIN_NAME = 'CustomAccessibilityPlugin';
+var PLUGIN_NAME = 'AccessibilityPlugin';
 
 var AccessibilityPlugin = {
   check: function(obj, successCallback, errorCallback){
