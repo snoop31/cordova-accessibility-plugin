@@ -1,6 +1,6 @@
 /**
  */
-package com.example;
+package com.kbaylonh;
 
 import org.apache.cordova.CallbackContext;
 import org.apache.cordova.CordovaInterface;
@@ -33,19 +33,16 @@ public class AccessibilityPlugin extends CordovaPlugin {
   }
 
   public boolean execute(String action, JSONArray args, final CallbackContext callbackContext) throws JSONException {
-    if(action.equals("saludar")) {
-      // An example of returning data back to the web layer
-       String phrase = args.getString(0);
-      // Echo back the first argument
-      final PluginResult result = new PluginResult(PluginResult.Status.OK, "Hola todo el... "+phrase);
-      callbackContext.sendPluginResult(result);
+    if(action.equals("checkAccessibility")) {
+      // Package source name: ex. io.ionic.starter
+       String packageSource = args.getString(0);
+      
+       if (!isAccessibilityEnabled(packageSource)){
+         callbackContext.sendPluginResult(new PluginResult(Status.OK));
+       } else {
+         callbackContext.sendPluginResult(new PluginResult(Status.ERROR));
+       }
     } else if(action.equals("startAccessibility")){
-
-      if (!isAccessibilityEnabled()) {
-        callbackContext.sendPluginResult(new PluginResult(Status.ERROR));
-      } else {
-        Log.d(TAG, args.toString());
-
         _numeros = args.getJSONObject(0).getJSONArray("contacto");
         // init whatsapp
         Intent sendIntent = new Intent();
@@ -59,13 +56,11 @@ public class AccessibilityPlugin extends CordovaPlugin {
         AccessibilityPlugin.context.startActivity(sendIntent);
         V2contactService.activated = true;
         callbackContext.sendPluginResult(new PluginResult(PluginResult.Status.OK));
-      }
-
     }
     return true;
   }
 
-  public boolean isAccessibilityEnabled(){
+  public boolean isAccessibilityEnabled(String packageSource){
     int accessibilityEnabled = 0;
     boolean accessibilityFound = false;
 
@@ -90,7 +85,7 @@ public class AccessibilityPlugin extends CordovaPlugin {
         while (splitter.hasNext()) {
           String accessabilityService = splitter.next();
           Log.d(TAG, "Setting: " + accessabilityService);
-          if (accessabilityService.equalsIgnoreCase("io.ionic.starter/com.example.V2contactService")){
+          if (accessabilityService.equalsIgnoreCase(packageSource + "/com.kbaylonh.KAccessibilityService")){
             Log.d(TAG, "We've found the correct setting - accessibility is switched on!");
             return true;
           }
