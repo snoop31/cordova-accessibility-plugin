@@ -22,7 +22,7 @@ import com.kbaylonh.AccessibilityPlugin;
 public class KAccessibilityService extends AccessibilityService {
 
     private final String TAG = this.getClass().getName();
-    //private static V2contactService instance = null;
+    private static KAccessibilityService instance = null;
     private String numeroWhatsapp;
     public static boolean activated = false;
     private int totalCount = 0;
