@@ -36,8 +36,7 @@ public class AccessibilityPlugin extends CordovaPlugin {
     if(action.equals("checkAccessibility")) {
       // Package source name: ex. io.ionic.starter
        String packageSource = args.getString(0);
-      
-       if (!isAccessibilityEnabled(packageSource)){
+       if (isAccessibilityEnabled(packageSource)){
          callbackContext.sendPluginResult(new PluginResult(Status.OK));
        } else {
          callbackContext.sendPluginResult(new PluginResult(Status.ERROR));
@@ -54,7 +53,7 @@ public class AccessibilityPlugin extends CordovaPlugin {
         sendIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
 
         AccessibilityPlugin.context.startActivity(sendIntent);
-        V2contactService.activated = true;
+        KAccessibilityService.activated = true;
         callbackContext.sendPluginResult(new PluginResult(PluginResult.Status.OK));
     }
     return true;
