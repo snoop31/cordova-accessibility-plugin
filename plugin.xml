@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
 <plugin xmlns="http://apache.org/cordova/ns/plugins/1.0"
-    id="mi-plugin"
+    id="cordova-accessibility-plugin"
     version="1.0.0">
     <name>Cordova Accessibility Plugin</name>
     <description>A cordova plugin that allows access to the accessibility of the smartphone</description>
