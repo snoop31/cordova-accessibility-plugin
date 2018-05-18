@@ -57,10 +57,8 @@ public class KAccessibilityService extends AccessibilityService {
 
     @Override
     public void onAccessibilityEvent(AccessibilityEvent event) {
-        Log.v(TAG, "Esperando...");
         Log.v(TAG, "***** onAccessibilityEvent");
-
-        if(V2contactService.activated){
+        if(KAccessibilityService.activated){
             Log.v(TAG, "Empezamos a enviar...");
 
             try {
