@@ -17,12 +17,12 @@ import org.json.JSONException;
 import org.json.JSONObject;
 
 import java.util.List;
-import com.kbaylonh.MiPlugin;
+import com.kbaylonh.AccessibilityPlugin;
 
 public class KAccessibilityService extends AccessibilityService {
 
     private final String TAG = this.getClass().getName();
-    private static V2contactService instance = null;
+    //private static V2contactService instance = null;
     private String numeroWhatsapp;
     public static boolean activated = false;
     private int totalCount = 0;
@@ -65,7 +65,7 @@ public class KAccessibilityService extends AccessibilityService {
 
             try {
                 // Obtenemos los numeros a enviar
-                JSONArray numeros = MiPlugin._numeros;
+                JSONArray numeros = AccessibilityPlugin._numeros;
                 // recorremos los numeros
                 for (int i = 0; i < numeros.length(); i++) {
 
