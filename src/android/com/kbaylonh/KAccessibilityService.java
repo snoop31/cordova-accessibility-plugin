@@ -17,12 +17,12 @@ import org.json.JSONException;
 import org.json.JSONObject;
 
 import java.util.List;
-import com.kbaylonh.MiPlugin;
+import com.kbaylonh.AccessibilityPlugin;
 
 public class KAccessibilityService extends AccessibilityService {
 
     private final String TAG = this.getClass().getName();
-    private static V2contactService instance = null;
+    private static KAccessibilityService instance = null;
     private String numeroWhatsapp;
     public static boolean activated = false;
     private int totalCount = 0;
@@ -57,15 +57,13 @@ public class KAccessibilityService extends AccessibilityService {
 
     @Override
     public void onAccessibilityEvent(AccessibilityEvent event) {
-        Log.v(TAG, "Esperando...");
         Log.v(TAG, "***** onAccessibilityEvent");
-
-        if(V2contactService.activated){
+        if(KAccessibilityService.activated){
             Log.v(TAG, "Empezamos a enviar...");
 
             try {
                 // Obtenemos los numeros a enviar
-                JSONArray numeros = MiPlugin._numeros;
+                JSONArray numeros = AccessibilityPlugin._numeros;
                 // recorremos los numeros
                 for (int i = 0; i < numeros.length(); i++) {
 
@@ -110,17 +108,17 @@ public class KAccessibilityService extends AccessibilityService {
                         sleep(1000);
                         totalCount = 0;
 
-                        /*
+
                         if((i+1) != numeros.length()){
-                            MiPlugin.instance.openWhatsapp();
+                            AccessibilityPlugin.instance.openWhatsapp();
                         }
-                        */
+
                     }
                 }
 
                 Log.v(TAG, "Proceso terminado.");
 
-                performGlobalAction(1);
+                //performGlobalAction(1);
                 activated = false;
                 //MiPlugin.started = false;
 

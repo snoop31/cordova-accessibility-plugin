@@ -1,11 +1,33 @@
 {
-  "name": "cordova-accessibility-plugin",
-  "version": "1.0.0",
+  "_from": "git+https://github.com/KbaylonH/cordova-accessibility-plugin.git",
+  "_id": "cordova-accessibility-plugin@1.0.0",
+  "_inBundle": false,
+  "_location": "/cordova-accessibility-plugin",
+  "_phantomChildren": {},
+  "_requested": {
+    "type": "git",
+    "raw": "https://github.com/KbaylonH/cordova-accessibility-plugin.git",
+    "rawSpec": "https://github.com/KbaylonH/cordova-accessibility-plugin.git",
+    "saveSpec": "git+https://github.com/KbaylonH/cordova-accessibility-plugin.git",
+    "fetchSpec": "https://github.com/KbaylonH/cordova-accessibility-plugin.git",
+    "gitCommittish": null
+  },
+  "_requiredBy": [
+    "#USER",
+    "/"
+  ],
+  "_resolved": "git+https://github.com/KbaylonH/cordova-accessibility-plugin.git#5be491bd24f8264287ed873c9416447972c6f716",
+  "_spec": "https://github.com/KbaylonH/cordova-accessibility-plugin.git",
+  "_where": "D:\\laragon\\ionic\\v2contactpro",
+  "bundleDependencies": false,
   "cordova": {
     "id": "cordova-accessibility-plugin",
     "platforms": [
       "android"
     ]
   },
-  "description": "A custom accessibility plugin for cordova"
+  "deprecated": false,
+  "description": "A custom accessibility plugin for cordova",
+  "name": "cordova-accessibility-plugin",
+  "version": "1.0.0"
 }

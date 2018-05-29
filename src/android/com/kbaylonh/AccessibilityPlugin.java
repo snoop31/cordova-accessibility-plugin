@@ -1,6 +1,4 @@
-/**
- */
-package com.example;
+package com.kbaylonh;
 
 import org.apache.cordova.CallbackContext;
 import org.apache.cordova.CordovaInterface;
@@ -8,12 +6,11 @@ import org.apache.cordova.CordovaPlugin;
 import org.apache.cordova.CordovaWebView;
 import org.apache.cordova.PluginResult;
 import org.apache.cordova.PluginResult.Status;
-import org.json.JSONObject;
 import org.json.JSONArray;
 import org.json.JSONException;
+import org.json.JSONObject;
 
-import android.app.AlertDialog;
-import android.content.DialogInterface;
+import android.net.Uri;
 import android.provider.Settings;
 import android.text.TextUtils;
 import android.util.Log;
@@ -22,55 +19,133 @@ import android.content.Intent;
 
 public class AccessibilityPlugin extends CordovaPlugin {
   private static final String TAG = "AccessibilityPlugin";
-  protected static Context context = null;
+  protected Context context = null;
   public static JSONArray _numeros = null;
-  public CordovaInterface cordova           = null;
+  public static AccessibilityPlugin instance = null;
+  private Intent whatsappIntent = null;
 
   public void initialize(CordovaInterface cordova, CordovaWebView webView) {
     super.initialize(cordova, webView);
-    AccessibilityPlugin.context = super.cordova.getActivity().getApplicationContext();
+    context = super.cordova.getActivity().getApplicationContext();
+
     Log.d(TAG, "Inicializando AccessibilityPlugin");
+    instance = this;
   }
 
   public boolean execute(String action, JSONArray args, final CallbackContext callbackContext) throws JSONException {
-    if(action.equals("saludar")) {
-      // An example of returning data back to the web layer
-       String phrase = args.getString(0);
-      // Echo back the first argument
-      final PluginResult result = new PluginResult(PluginResult.Status.OK, "Hola todo el... "+phrase);
-      callbackContext.sendPluginResult(result);
-    } else if(action.equals("startAccessibility")){
 
-      if (!isAccessibilityEnabled()) {
+    switch(action){
+      case "checkAccessibility":
+        String packageSource = args.getString(0);
+        if (isAccessibilityEnabled(packageSource)){
+          callbackContext.sendPluginResult(new PluginResult(Status.OK));
+        } else {
+          callbackContext.sendPluginResult(new PluginResult(Status.ERROR));
+        }
+        break;
+      case "startAccessibility":
+
+        // clear contacts
+        _numeros = new JSONArray();
+        JSONArray rawContacts = args.getJSONObject(0).getJSONArray("contacto");
+
+        for(int i=0; i<rawContacts.length();i++){
+          // get contact
+          JSONObject contact = rawContacts.getJSONObject(i);
+
+          // flag to add _numeros variable...
+          boolean process = false;
+
+          // check if exists in cellphone
+          if(!ContactHelper.contactExists(context.getApplicationContext(), contact.getString("numero")) ){
+            // try to create it
+            if( ContactHelper.insertContact(context.getContentResolver(), contact.getString("nombre"), contact.getString("numero")) ){
+              process = true;
+            }
+          } else {
+            process = true;
+          }
+
+          if(process)
+            _numeros.put(contact);
+        }
+
+        // send whatsapp intent
+        whatsappIntent = new Intent();
+        whatsappIntent.setAction(Intent.ACTION_SEND);
+        whatsappIntent.setPackage("com.whatsapp");
+        whatsappIntent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP);
+        whatsappIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+
+        // attach messahe
+        if(args.getJSONObject(0).getString("mensaje") != null){
+          try {
+            whatsappIntent.putExtra(Intent.EXTRA_TEXT, args.getJSONObject(0).getString("mensaje"));
+            whatsappIntent.setType("text/plain");
+          } catch (Exception e) {
+            e.printStackTrace();
+          }
+        }
+
+        // attach file
+        if(args.getJSONObject(0).getString("attachment") != null){
+          try {
+            whatsappIntent.putExtra("android.intent.extra.STREAM", Uri.parse( args.getJSONObject(0).getJSONObject("attachment").getString("uri") ));
+            whatsappIntent.setType(args.getJSONObject(0).getJSONObject("attachment").getString("type"));
+          } catch (Exception e) {
+            e.printStackTrace();
+          }
+        }
+
+        // open whatsapp
+        this.openWhatsapp();
+
+        // active AccessibilityService
+
+        KAccessibilityService.activated = true;
+
+        super.cordova.getThreadPool().execute(new Runnable() {
+          @Override
+          public void run() {
+            callbackContext.sendPluginResult(new PluginResult(PluginResult.Status.OK, _numeros.length()));
+          }
+        });
+        break;
+      case "openAccessibility":
+        Intent intent = new Intent(android.provider.Settings.ACTION_ACCESSIBILITY_SETTINGS);
+        intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP);
+        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+        super.cordova.getActivity().startActivity(intent);
+        callbackContext.sendPluginResult(new PluginResult(Status.OK));
+        break;
+      case "checkService":
+        if(!KAccessibilityService.activated){
+          callbackContext.sendPluginResult(new PluginResult(Status.OK));
+        } else {
+          callbackContext.sendPluginResult(new PluginResult(Status.ERROR));
+        }
+        break;
+      case "stopService":
+        try {
+          KAccessibilityService.activated = false;
+          callbackContext.sendPluginResult(new PluginResult(Status.OK));
+        } catch (Exception e) {
+          callbackContext.sendPluginResult(new PluginResult(Status.ERROR));
+        }
+        break;
+      default:
         callbackContext.sendPluginResult(new PluginResult(Status.ERROR));
-      } else {
-        Log.d(TAG, args.toString());
-
-        _numeros = args.getJSONObject(0).getJSONArray("contacto");
-        // init whatsapp
-        Intent sendIntent = new Intent();
-        sendIntent.setAction(Intent.ACTION_SEND);
-        sendIntent.putExtra(Intent.EXTRA_TEXT, args.getJSONObject(0).getString("mensaje"));
-        sendIntent.setPackage("com.whatsapp");
-        sendIntent.setType("text/plain");
-        sendIntent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP);
-        sendIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-
-        AccessibilityPlugin.context.startActivity(sendIntent);
-        V2contactService.activated = true;
-        callbackContext.sendPluginResult(new PluginResult(PluginResult.Status.OK));
-      }
-
+        break;
     }
+
     return true;
   }
 
-  public boolean isAccessibilityEnabled(){
+  private boolean isAccessibilityEnabled(String packageSource){
     int accessibilityEnabled = 0;
-    boolean accessibilityFound = false;
 
     try {
-      accessibilityEnabled = Settings.Secure.getInt(AccessibilityPlugin.context.getContentResolver(),android.provider.Settings.Secure.ACCESSIBILITY_ENABLED);
+      accessibilityEnabled = Settings.Secure.getInt(context.getContentResolver(),android.provider.Settings.Secure.ACCESSIBILITY_ENABLED);
       Log.d(TAG, "ACCESSIBILITY: " + accessibilityEnabled);
     } catch (Settings.SettingNotFoundException e) {
       Log.d(TAG, "Error finding setting, default accessibility to not found: " + e.getMessage());
@@ -82,7 +157,7 @@ public class AccessibilityPlugin extends CordovaPlugin {
       Log.d(TAG, "***ACCESSIBILIY IS ENABLED***: ");
 
 
-      String settingValue = Settings.Secure.getString(AccessibilityPlugin.context.getContentResolver(), Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES);
+      String settingValue = Settings.Secure.getString(context.getContentResolver(), Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES);
       Log.d(TAG, "Setting: " + settingValue);
       if (settingValue != null) {
         TextUtils.SimpleStringSplitter splitter = mStringColonSplitter;
@@ -90,7 +165,7 @@ public class AccessibilityPlugin extends CordovaPlugin {
         while (splitter.hasNext()) {
           String accessabilityService = splitter.next();
           Log.d(TAG, "Setting: " + accessabilityService);
-          if (accessabilityService.equalsIgnoreCase("io.ionic.starter/com.example.V2contactService")){
+          if (accessabilityService.equalsIgnoreCase(packageSource + "/com.kbaylonh.KAccessibilityService")){
             Log.d(TAG, "We've found the correct setting - accessibility is switched on!");
             return true;
           }
@@ -102,6 +177,11 @@ public class AccessibilityPlugin extends CordovaPlugin {
     else{
       Log.d(TAG, "***ACCESSIBILIY IS DISABLED***");
     }
-    return accessibilityFound;
+
+    return false;
+  }
+
+  public void openWhatsapp(){
+    super.cordova.getActivity().startActivity(whatsappIntent);
   }
 }
