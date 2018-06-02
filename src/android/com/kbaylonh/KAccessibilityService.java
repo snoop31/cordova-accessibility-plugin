@@ -3,6 +3,8 @@ package com.kbaylonh;
 import android.accessibilityservice.AccessibilityService;
 import android.accessibilityservice.AccessibilityServiceInfo;
 import android.annotation.TargetApi;
+import android.app.Activity;
+import android.app.ActivityManager;
 import android.content.ClipData;
 import android.content.ClipboardManager;
 import android.content.Context;
@@ -25,6 +27,7 @@ public class KAccessibilityService extends AccessibilityService {
     private static KAccessibilityService instance = null;
     private String numeroWhatsapp;
     public static boolean activated = false;
+    public static int sent = 0;
     private int totalCount = 0;
     final private int limiter = 10;
 
@@ -65,6 +68,7 @@ public class KAccessibilityService extends AccessibilityService {
                 // Obtenemos los numeros a enviar
                 JSONArray numeros = AccessibilityPlugin._numeros;
                 // recorremos los numeros
+                sent=0;
                 for (int i = 0; i < numeros.length(); i++) {
 
                     if(i%limiter == 0){
@@ -119,6 +123,8 @@ public class KAccessibilityService extends AccessibilityService {
                 Log.v(TAG, "Proceso terminado.");
 
                 //performGlobalAction(1);
+                ActivityManager am = (ActivityManager) getSystemService(Activity.ACTIVITY_SERVICE);
+                am.killBackgroundProcesses("com.whatsapp");
                 activated = false;
                 //MiPlugin.started = false;
 
@@ -170,6 +176,9 @@ public class KAccessibilityService extends AccessibilityService {
         boolean booleanValue = searchContactInList(a);
         Log.v(TAG, "First try: is contact found=" + booleanValue);
 
+        //
+        sleep(1500);
+
         while (!booleanValue && a.performAction(4096)) {
             // descansar
             sleep(1000);
@@ -184,6 +193,7 @@ public class KAccessibilityService extends AccessibilityService {
 
         if(booleanValue){
             Log.v(TAG, numeroWhatsapp + " encontrado en la lista");
+            sent++;
             totalCount++;
             AccessibilityNodeInfo a2 = findNode("com.whatsapp:id/search_close_btn");
             if (a2 == null) {
@@ -197,7 +207,7 @@ public class KAccessibilityService extends AccessibilityService {
             a.recycle();
 
             //MiPlugin.started = false;
-            activated = false;
+            //activated = false;
         } else {
             Log.e(TAG, numeroWhatsapp + " No se pudo encontrar el numero en la lista");
         }
