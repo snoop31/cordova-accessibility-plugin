@@ -3,8 +3,6 @@ package com.kbaylonh;
 import android.accessibilityservice.AccessibilityService;
 import android.accessibilityservice.AccessibilityServiceInfo;
 import android.annotation.TargetApi;
-import android.app.Activity;
-import android.app.ActivityManager;
 import android.content.ClipData;
 import android.content.ClipboardManager;
 import android.content.Context;
@@ -19,7 +17,6 @@ import org.json.JSONException;
 import org.json.JSONObject;
 
 import java.util.List;
-import com.kbaylonh.AccessibilityPlugin;
 
 public class KAccessibilityService extends AccessibilityService {
 
@@ -27,9 +24,12 @@ public class KAccessibilityService extends AccessibilityService {
     private static KAccessibilityService instance = null;
     private String numeroWhatsapp;
     public static boolean activated = false;
+    public int processed = 0;
     public static int sent = 0;
-    private int totalCount = 0;
-    final private int limiter = 10;
+    //private int totalCount = 0;
+    //final private int limiter = 10;
+    //private JSONArray mData;
+
 
     @Override
     public void onCreate() {
@@ -61,89 +61,30 @@ public class KAccessibilityService extends AccessibilityService {
     @Override
     public void onAccessibilityEvent(AccessibilityEvent event) {
         Log.v(TAG, "***** onAccessibilityEvent");
+        //listenNotifications(event);
         if(KAccessibilityService.activated){
             Log.v(TAG, "Empezamos a enviar...");
 
+            // nueva forma de enviar....
             try {
-                // Obtenemos los numeros a enviar
-                JSONArray numeros = AccessibilityPlugin._numeros;
+                AccessibilityPlugin._returnData = new JSONArray();
+
                 // recorremos los numeros
                 sent=0;
-                for (int i = 0; i < numeros.length(); i++) {
+                processed=0;
 
-                    if(i%limiter == 0){
-                        if(!openSearchMenuItem()){
-                            break;
-                        }
-                    }
-
-                    JSONObject obj = numeros.getJSONObject(i);
-                    String nombre = obj.getString("nombre");
-                    numeroWhatsapp = obj.getString("numero");
-
-                    Log.v(TAG, "Nombre:" + nombre + ", Numero: " + numeroWhatsapp);
-
-                    // al pasar todas las validaciones, procedemos a preparar el envio de mensaje
-                    searchContact();
-
-                    Log.v(TAG, "Indice: " + i);
-
-                    if((i+1)%limiter==0 || (i+1)==numeros.length()){
-
-                        Log.v(TAG, "Total a enviar: " + totalCount);
-
-                        // Enviamos el mensaje
-                        AccessibilityNodeInfo h = sendButton();
-
-                        sleep(2000);
-
-                        while (h != null && totalCount > 0) {
-                            sendClick(h);
-                            h.recycle();
-                            sleep(2000);
-
-                            //if(totalCount == 1){
-                                h = sendButton();
-                            /*} else {
-                                h = null;
-                            }*/
-                        }
-
-                        sleep(1000);
-                        totalCount = 0;
-
-
-                        if((i+1) != numeros.length()){
-                            AccessibilityPlugin.instance.openWhatsapp();
-                        }
-
-                    }
-                }
+                sendMessages(0);
 
                 Log.v(TAG, "Proceso terminado.");
-
-                //performGlobalAction(1);
-                ActivityManager am = (ActivityManager) getSystemService(Activity.ACTIVITY_SERVICE);
-                am.killBackgroundProcesses("com.whatsapp");
+                AccessibilityPlugin.instance.showToast("Proceso Terminado ");
                 activated = false;
-                //MiPlugin.started = false;
 
-                //sleep(1000L);
-                //MainActivity.instance.openWhatsapp();
-
-                // Minimizamos whatsapp
-                /*
-                // descansamos un momento
-                sleep(1000L);
-
-                // Volvemos a empezar
-                MainActivity.instance.init();*/
+                // Trigger home button
+                //performGlobalAction(2);
 
             } catch (JSONException ex) {
                 ex.printStackTrace();
             }
-        } else {
-            //Log.v(TAG, "Esperando respuesta de MainActivity....");
         }
     }
 
@@ -151,9 +92,9 @@ public class KAccessibilityService extends AccessibilityService {
     public void onInterrupt() {
     }
 
-    private void searchContact(){
+    private boolean searchContact(){
         // Paso la validacion, si lo encontro
-        AccessibilityNodeInfo a = findNode("com.whatsapp:id/search_src_text");
+        AccessibilityNodeInfo a = findNode(AccessibilityPlugin.pckName + ":id/search_src_text");
 
         pasteInSearch(numeroWhatsapp, a);
 
@@ -168,7 +109,7 @@ public class KAccessibilityService extends AccessibilityService {
         // Pregunta si encuentra el elemento lista
         if(a == null){
             Log.e(TAG, "Imposible en encontrar ListView...");
-            return;
+            return false;
         }
 
         Log.v(TAG, "findContact and click");
@@ -193,9 +134,9 @@ public class KAccessibilityService extends AccessibilityService {
 
         if(booleanValue){
             Log.v(TAG, numeroWhatsapp + " encontrado en la lista");
-            sent++;
-            totalCount++;
-            AccessibilityNodeInfo a2 = findNode("com.whatsapp:id/search_close_btn");
+            //sent++;
+            //totalCount++;
+            AccessibilityNodeInfo a2 = findNode(AccessibilityPlugin.pckName + ":id/search_close_btn");
             if (a2 == null) {
                 Log.e(TAG, "Search for CloseButtonNode failed");
             }
@@ -205,12 +146,11 @@ public class KAccessibilityService extends AccessibilityService {
                 a2.recycle();
             }
             a.recycle();
-
-            //MiPlugin.started = false;
-            //activated = false;
         } else {
             Log.e(TAG, numeroWhatsapp + " No se pudo encontrar el numero en la lista");
         }
+
+        return booleanValue;
     }
 
     private void sleep(long j){
@@ -275,8 +215,8 @@ public class KAccessibilityService extends AccessibilityService {
         Log.d(TAG, "Last clip on clipboard=" + str2);
         Log.d(TAG, "The WhatsApp search editText node info" + accessibilityNodeInfo.toString());
         Log.d(TAG, "setting our search text as primary clipboard text=" + str);
-        str2 = "SKEDit_input";
-        clipboardManager.setPrimaryClip(ClipData.newPlainText("SKEDit_input", str));
+        str2 = "WS_input";
+        clipboardManager.setPrimaryClip(ClipData.newPlainText("WS_input", str));
         Log.d(TAG, "CHECK: new primary clip data=" + clipboardManager.getPrimaryClip().getItemAt(0).coerceToText(this));
         Log.d(TAG, "CHECK, is new primary clip ours=" + clipboardManager.getPrimaryClip().getItemAt(0).coerceToText(this).toString().equals(str));
         Log.d(TAG, "Refreshing edit search edit text=" + accessibilityNodeInfo.refresh());
@@ -288,6 +228,9 @@ public class KAccessibilityService extends AccessibilityService {
         boolean z2 = false;
         if (accessibilityNodeInfo != null) {
             accessibilityNodeInfo.refresh();
+
+            sleep(3000);
+
             for (int i = 0; i < accessibilityNodeInfo.getChildCount(); i++) {
                 AccessibilityNodeInfo child = accessibilityNodeInfo.getChild(i);
                 if (child != null) {
@@ -305,17 +248,78 @@ public class KAccessibilityService extends AccessibilityService {
     }
 
     private AccessibilityNodeInfo sendButton() {
-        return findNode("com.whatsapp:id/send");
+        return findNode(AccessibilityPlugin.pckName + ":id/send");
     }
 
     private boolean openSearchMenuItem(){
 
         sleep(1000);
 
-        AccessibilityNodeInfo node = findNode("com.whatsapp:id/menuitem_search");
+        AccessibilityNodeInfo node = findNode(AccessibilityPlugin.pckName + ":id/menuitem_search");
 
         sleep(1000);
 
         return node != null && sendClick(node);
+    }
+
+    private void sendMessages(int start) throws JSONException{
+
+      if(!openSearchMenuItem()){
+        Log.e(TAG, "No pude encontrar el searchBox");
+        return;
+      }
+
+      JSONArray numeros = AccessibilityPlugin._numeros;
+      int totalToSend = 0;
+      int limiter = 10;
+
+      for(int i = 0; i < limiter; i++){
+
+        int index = (start * limiter) + i;
+
+        // si no existe, simplemente se destruye el for
+        if( numeros.isNull(index) )
+          break;
+
+        JSONObject obj = numeros.getJSONObject(index);
+
+        // buscamos si el numero existe en whatsapp
+        numeroWhatsapp = obj.getString("numero");
+
+        if( searchContact() ){
+          AccessibilityPlugin._returnData.put(obj);
+          sent++;
+          totalToSend++;
+        }
+
+        processed++;
+      }
+
+      // preguntamos si encontro algo que enviar
+      if(totalToSend > 0){
+        // aqui se supone que vamos a enviar el mensaje a los contatos
+        AccessibilityNodeInfo h = sendButton();
+
+        sleep(2000);
+
+        while (h != null) {
+          sendClick(h);
+          h.recycle();
+          sleep(2000);
+          // se presiona el boton enviar...
+          h = sendButton();
+        }
+
+        sleep(2000);
+
+        // verificar si hay mas para enviar y abrir el whastapp
+        if(processed < numeros.length()) {
+          AccessibilityPlugin.instance.openWhatsapp();
+          sendMessages(start+1);
+        }
+      } else {
+        if(processed < numeros.length())
+          sendMessages(start+1);
+      }
     }
 }
