@@ -16,6 +16,12 @@ var AccessibilityPlugin = {
   open: function(successCallback, errorCallback){
     exec(successCallback, errorCallback, PLUGIN_NAME, "openAccessibility", null);
   },
+  action: function(obj, successCallback, errorCallback){
+    exec(successCallback, errorCallback, PLUGIN_NAME, "actionAccessibility", [obj]);
+  },
+  mode: function(successCallback, errorCallback){
+    exec(successCallback, errorCallback, PLUGIN_NAME, "checkMultiWindowMode");
+  },
   service: {
     check: function(successCallback, errorCallback){
       exec(successCallback, errorCallback, PLUGIN_NAME, "checkService", null);
