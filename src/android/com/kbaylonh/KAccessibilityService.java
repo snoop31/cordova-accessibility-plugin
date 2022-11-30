@@ -1,325 +1,151 @@
 package com.kbaylonh;
 
-import android.accessibilityservice.AccessibilityService;
-import android.accessibilityservice.AccessibilityServiceInfo;
-import android.annotation.TargetApi;
-import android.content.ClipData;
-import android.content.ClipboardManager;
-import android.content.Context;
-import android.os.Build;
-import android.os.Bundle;
-import android.util.Log;
-import android.view.accessibility.AccessibilityEvent;
-import android.view.accessibility.AccessibilityNodeInfo;
-
+import org.apache.cordova.CallbackContext;
+import org.apache.cordova.CordovaInterface;
+import org.apache.cordova.CordovaPlugin;
+import org.apache.cordova.CordovaWebView;
+import org.apache.cordova.PluginResult;
+import org.apache.cordova.PluginResult.Status;
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
-import java.util.List;
+import android.net.Uri;
+import android.os.StrictMode;
+import android.provider.Settings;
+import android.text.TextUtils;
+import android.util.Log;
+import android.content.Context;
+import android.content.Intent;
+import android.os.Build;
 
-public class KAccessibilityService extends AccessibilityService {
+import android.support.v4.content.LocalBroadcastManager;
+import android.os.Bundle;
+import android.content.res.Configuration;
 
-    private final String TAG = this.getClass().getName();
-    private static KAccessibilityService instance = null;
-    private String numeroWhatsapp;
-    public static boolean activated = false;
-    public int processed = 0;
-    public static int sent = 0;
-    //private int totalCount = 0;
-    //final private int limiter = 10;
-    //private JSONArray mData;
+public class AccessibilityPlugin extends CordovaPlugin {
+  private static final String TAG = "AccessibilityPlugin";
+  protected Context context = null;
+  public static AccessibilityPlugin instance = null;
 
+  @Override
+  public void onConfigurationChanged(Configuration newConfig) {
+      super.onConfigurationChanged(newConfig);
+      Log.v(TAG, "***** onMultiWindowModeChanged: " + cordova.getActivity().isInMultiWindowMode());
+      final Intent intent = new Intent("layoutChannel");
+      Bundle b = new Bundle();
+      b.putString("action", "split_status");
+      b.putBoolean("status", cordova.getActivity().isInMultiWindowMode());
+      intent.putExtras(b);
+      LocalBroadcastManager.getInstance(cordova.getActivity()).sendBroadcastSync(intent);
+  }
 
-    @Override
-    public void onCreate() {
-        super.onCreate();
-        instance = this;
-        Log.d(TAG, "servicio creado");
-    }
+  public void initialize(CordovaInterface cordova, CordovaWebView webView) {
+    super.initialize(cordova, webView);
+    context = super.cordova.getActivity().getApplicationContext();
 
-    @Override
-    protected void onServiceConnected() {
-        super.onServiceConnected();
-        AccessibilityServiceInfo info = new AccessibilityServiceInfo();
-        info.eventTypes = AccessibilityEvent.TYPES_ALL_MASK;
-        info.feedbackType = AccessibilityServiceInfo.FEEDBACK_GENERIC;
-        info.feedbackType = AccessibilityServiceInfo.FEEDBACK_GENERIC;
+    Log.d(TAG, "Inicializando AccessibilityPlugin");
+    instance = this;
+  }
 
-        info.flags = AccessibilityServiceInfo.DEFAULT;
-        info.flags = AccessibilityServiceInfo.FLAG_INCLUDE_NOT_IMPORTANT_VIEWS;
-        info.flags = AccessibilityServiceInfo.FLAG_REPORT_VIEW_IDS;
-        info.flags = AccessibilityServiceInfo.FLAG_REQUEST_TOUCH_EXPLORATION_MODE;
-        info.flags = AccessibilityServiceInfo.FLAG_REQUEST_ENHANCED_WEB_ACCESSIBILITY;
-        info.flags = AccessibilityServiceInfo.FLAG_RETRIEVE_INTERACTIVE_WINDOWS;
-
-        info.notificationTimeout = 0;
-        this.setServiceInfo(info);
-        Log.d(TAG, "servicio conectado");
-    }
-
-    @Override
-    public void onAccessibilityEvent(AccessibilityEvent event) {
-        Log.v(TAG, "***** onAccessibilityEvent");
-        //listenNotifications(event);
-        if(KAccessibilityService.activated){
-            Log.v(TAG, "Empezamos a enviar...");
-
-            // nueva forma de enviar....
-            try {
-                AccessibilityPlugin._returnData = new JSONArray();
-
-                // recorremos los numeros
-                sent=0;
-                processed=0;
-
-                sendMessages(0);
-
-                Log.v(TAG, "Proceso terminado.");
-                AccessibilityPlugin.instance.showToast("Proceso Terminado ");
-                activated = false;
-
-                // Trigger home button
-                //performGlobalAction(2);
-
-            } catch (JSONException ex) {
-                ex.printStackTrace();
-            }
-        }
-    }
-
-    @Override
-    public void onInterrupt() {
-    }
-
-    private boolean searchContact(){
-        // Paso la validacion, si lo encontro
-        AccessibilityNodeInfo a = findNode(AccessibilityPlugin.pckName + ":id/search_src_text");
-
-        pasteInSearch(numeroWhatsapp, a);
-
-        sleep(1500);
-
-        if (a != null) {
-            a.recycle();
-        }
-
-        a = findNode("android:id/list");
-
-        // Pregunta si encuentra el elemento lista
-        if(a == null){
-            Log.e(TAG, "Imposible en encontrar ListView...");
-            return false;
-        }
-
-        Log.v(TAG, "findContact and click");
-
-        boolean booleanValue = searchContactInList(a);
-        Log.v(TAG, "First try: is contact found=" + booleanValue);
-
-        //
-        sleep(1500);
-
-        while (!booleanValue && a.performAction(4096)) {
-            // descansar
-            sleep(1000);
-
-            // intentar de nuevo
-            Log.d(TAG, "retry to find contact");
-
-            booleanValue = searchContactInList(a);
-
-            Log.v(TAG, "is contact found=" + booleanValue);
-        }
-
-        if(booleanValue){
-            Log.v(TAG, numeroWhatsapp + " encontrado en la lista");
-            //sent++;
-            //totalCount++;
-            AccessibilityNodeInfo a2 = findNode(AccessibilityPlugin.pckName + ":id/search_close_btn");
-            if (a2 == null) {
-                Log.e(TAG, "Search for CloseButtonNode failed");
-            }
-
-            sendClick(a2);
-            if (a2 != null) {
-                a2.recycle();
-            }
-            a.recycle();
+  public boolean execute(String action, JSONArray args, final CallbackContext callbackContext) throws JSONException{
+    switch(action){
+      case "checkAccessibility":
+        String packageSource = args.getString(0);
+        if (isAccessibilityEnabled(packageSource)){
+          callbackContext.sendPluginResult(new PluginResult(Status.OK));
         } else {
-            Log.e(TAG, numeroWhatsapp + " No se pudo encontrar el numero en la lista");
+          callbackContext.sendPluginResult(new PluginResult(Status.ERROR));
         }
-
-        return booleanValue;
-    }
-
-    private void sleep(long j){
-        try {
-            Thread.sleep(j);
-        } catch (Throwable e) {
-            e.printStackTrace();
-        }
-    }
-
-    private AccessibilityNodeInfo findNode(String str) {
-        List findAccessibilityNodeInfosByViewId;
-        int i = 0;
-        do {
-            AccessibilityNodeInfo rootInActiveWindow = instance.getRootInActiveWindow();
-            if (rootInActiveWindow != null) {
-                findAccessibilityNodeInfosByViewId = rootInActiveWindow.findAccessibilityNodeInfosByViewId(str);
-                i++;
-                sleep(500);
-                if (findAccessibilityNodeInfosByViewId != null && findAccessibilityNodeInfosByViewId.size() != 0) {
-                    break;
-                }
-            } else {
-                return null;
-            }
-        } while (i < 10);
-        return (findAccessibilityNodeInfosByViewId == null || findAccessibilityNodeInfosByViewId.size() == 0) ? null : (AccessibilityNodeInfo) findAccessibilityNodeInfosByViewId.get(0);
-    }
-
-    private boolean sendClick(AccessibilityNodeInfo accessibilityNodeInfo) {
-        return accessibilityNodeInfo != null && accessibilityNodeInfo.performAction(16);
-    }
-
-    private void pasteInSearch(String str, AccessibilityNodeInfo accessibilityNodeInfo) {
-        if (accessibilityNodeInfo == null) {
-            Log.e(TAG,"cant find SearchTextBox");
-        } else if (Build.VERSION.SDK_INT >= 21) {
-            m10480b(str, accessibilityNodeInfo);
+        break;
+      case "startAccessibility":
+          KAccessibilityService.activated = true;
+        break;
+      case "actionAccessibility":
+        String actionName = args.getString(0);
+        KAccessibilityService service = new KAccessibilityService();
+        service.doAction(actionName);
+        break;
+      case "openAccessibility":
+        Intent intent = new Intent(android.provider.Settings.ACTION_ACCESSIBILITY_SETTINGS);
+        intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP);
+        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+        super.cordova.getActivity().startActivity(intent);
+        callbackContext.sendPluginResult(new PluginResult(Status.OK));
+        break;
+      case "checkService":
+        if(!KAccessibilityService.activated){
+          callbackContext.sendPluginResult(new PluginResult(Status.OK));
         } else {
-            m10481c(str, accessibilityNodeInfo);
+          callbackContext.sendPluginResult(new PluginResult(Status.ERROR));
         }
-    }
-    private void m10480b(String str, AccessibilityNodeInfo accessibilityNodeInfo) {
-        Bundle bundle = new Bundle();
-        bundle.putCharSequence("ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE", str);
-        accessibilityNodeInfo.performAction(2097152, bundle);
-        Log.v(TAG, "Numero " + numeroWhatsapp + " pegado en la searchbox");
-    }
-
-    @TargetApi(18)
-    private void m10481c(String str, AccessibilityNodeInfo accessibilityNodeInfo) {
-        Log.d(TAG, "API level below 21, using clipboard to send data");
-        ClipboardManager clipboardManager = (ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
-        String str2 = "";
+        break;
+      case "stopService":
         try {
-            str2 = clipboardManager.getPrimaryClip().getItemAt(0).coerceToText(this).toString();
-        } catch (Throwable e) {
-            Throwable th = e;
-            str2 = "";
-            e.printStackTrace();
+          KAccessibilityService.activated = false;
+          callbackContext.sendPluginResult(new PluginResult(Status.OK));
+        } catch (Exception e) {
+          e.printStackTrace();
+          callbackContext.sendPluginResult(new PluginResult(Status.ERROR));
         }
-        Log.d(TAG, "Last clip on clipboard=" + str2);
-        Log.d(TAG, "The WhatsApp search editText node info" + accessibilityNodeInfo.toString());
-        Log.d(TAG, "setting our search text as primary clipboard text=" + str);
-        str2 = "WS_input";
-        clipboardManager.setPrimaryClip(ClipData.newPlainText("WS_input", str));
-        Log.d(TAG, "CHECK: new primary clip data=" + clipboardManager.getPrimaryClip().getItemAt(0).coerceToText(this));
-        Log.d(TAG, "CHECK, is new primary clip ours=" + clipboardManager.getPrimaryClip().getItemAt(0).coerceToText(this).toString().equals(str));
-        Log.d(TAG, "Refreshing edit search edit text=" + accessibilityNodeInfo.refresh());
-        sleep(500);
-        Log.d(TAG, "Pasting text to search edit text=" + accessibilityNodeInfo.performAction(32768));
-    }
-
-    private Boolean searchContactInList(AccessibilityNodeInfo accessibilityNodeInfo) {
-        boolean z2 = false;
-        if (accessibilityNodeInfo != null) {
-            accessibilityNodeInfo.refresh();
-
-            sleep(3000);
-
-            for (int i = 0; i < accessibilityNodeInfo.getChildCount(); i++) {
-                AccessibilityNodeInfo child = accessibilityNodeInfo.getChild(i);
-                if (child != null) {
-                    if(child.getChildCount()>1){
-                        sendClick(child);
-                        child.recycle();
-                        z2 = true;
-                        break;
-                    }
-                    child.recycle();
-                }
-            }
+        break;
+      case "checkMultiWindowMode":
+        try {
+          boolean isInMultiWindowMode = false;
+          if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+            isInMultiWindowMode = cordova.getActivity().isInMultiWindowMode();
+          }
+          callbackContext.sendPluginResult(new PluginResult(Status.OK, isInMultiWindowMode));
+        } catch (Exception e) {
+          e.printStackTrace();
+          callbackContext.sendPluginResult(new PluginResult(Status.ERROR));
         }
-        return z2;
+        break;
+      default:
+        callbackContext.sendPluginResult(new PluginResult(Status.ERROR));
+        break;
     }
 
-    private AccessibilityNodeInfo sendButton() {
-        return findNode(AccessibilityPlugin.pckName + ":id/send");
+    return true;
+  }
+
+  private boolean isAccessibilityEnabled(String packageSource){
+    int accessibilityEnabled = 0;
+
+    try {
+      accessibilityEnabled = Settings.Secure.getInt(context.getContentResolver(),android.provider.Settings.Secure.ACCESSIBILITY_ENABLED);
+      Log.d(TAG, "ACCESSIBILITY: " + accessibilityEnabled);
+    } catch (Settings.SettingNotFoundException e) {
+      Log.d(TAG, "Error finding setting, default accessibility to not found: " + e.getMessage());
     }
 
-    private boolean openSearchMenuItem(){
+    TextUtils.SimpleStringSplitter mStringColonSplitter = new TextUtils.SimpleStringSplitter(':');
 
-        sleep(1000);
+    if (accessibilityEnabled==1){
+      Log.d(TAG, "***ACCESSIBILIY IS ENABLED***: ");
 
-        AccessibilityNodeInfo node = findNode(AccessibilityPlugin.pckName + ":id/menuitem_search");
 
-        sleep(1000);
-
-        return node != null && sendClick(node);
-    }
-
-    private void sendMessages(int start) throws JSONException{
-
-      if(!openSearchMenuItem()){
-        Log.e(TAG, "No pude encontrar el searchBox");
-        return;
+      String settingValue = Settings.Secure.getString(context.getContentResolver(), Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES);
+      Log.d(TAG, "Setting: " + settingValue);
+      if (settingValue != null) {
+        TextUtils.SimpleStringSplitter splitter = mStringColonSplitter;
+        mStringColonSplitter.setString(settingValue);
+        while (splitter.hasNext()) {
+          String accessabilityService = splitter.next();
+          Log.d(TAG, "Setting: " + accessabilityService);
+          if (accessabilityService.equalsIgnoreCase(packageSource + "/com.kbaylonh.KAccessibilityService")){
+            Log.d(TAG, "We've found the correct setting - accessibility is switched on!");
+            return true;
+          }
+        }
       }
 
-      JSONArray numeros = AccessibilityPlugin._numeros;
-      int totalToSend = 0;
-      int limiter = 10;
-
-      for(int i = 0; i < limiter; i++){
-
-        int index = (start * limiter) + i;
-
-        // si no existe, simplemente se destruye el for
-        if( numeros.isNull(index) )
-          break;
-
-        JSONObject obj = numeros.getJSONObject(index);
-
-        // buscamos si el numero existe en whatsapp
-        numeroWhatsapp = obj.getString("numero");
-
-        if( searchContact() ){
-          AccessibilityPlugin._returnData.put(obj);
-          sent++;
-          totalToSend++;
-        }
-
-        processed++;
-      }
-
-      // preguntamos si encontro algo que enviar
-      if(totalToSend > 0){
-        // aqui se supone que vamos a enviar el mensaje a los contatos
-        AccessibilityNodeInfo h = sendButton();
-
-        sleep(2000);
-
-        while (h != null) {
-          sendClick(h);
-          h.recycle();
-          sleep(2000);
-          // se presiona el boton enviar...
-          h = sendButton();
-        }
-
-        sleep(2000);
-
-        // verificar si hay mas para enviar y abrir el whastapp
-        if(processed < numeros.length()) {
-          AccessibilityPlugin.instance.openWhatsapp();
-          sendMessages(start+1);
-        }
-      } else {
-        if(processed < numeros.length())
-          sendMessages(start+1);
-      }
+      Log.d(TAG, "***END***");
     }
+    else{
+      Log.d(TAG, "***ACCESSIBILIY IS DISABLED***");
+    }
+
+    return false;
+  }
 }
