@@ -10,27 +10,35 @@ import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
-import android.app.AlertDialog;
-import android.content.DialogInterface;
 import android.net.Uri;
-import android.os.PowerManager;
 import android.os.StrictMode;
 import android.provider.Settings;
 import android.text.TextUtils;
 import android.util.Log;
 import android.content.Context;
 import android.content.Intent;
-import android.widget.Toast;
+import android.os.Build;
+
+import android.support.v4.content.LocalBroadcastManager;
+import android.os.Bundle;
+import android.content.res.Configuration;
 
 public class AccessibilityPlugin extends CordovaPlugin {
   private static final String TAG = "AccessibilityPlugin";
   protected Context context = null;
-  public static String pckName = "com.whatsapp";
-  public static JSONArray _numeros = null;
   public static AccessibilityPlugin instance = null;
-  public static JSONArray _returnData = new JSONArray();
-  private Intent whatsappIntent = null;
-  PowerManager.WakeLock wl = null;
+
+  @Override
+  public void onConfigurationChanged(Configuration newConfig) {
+      super.onConfigurationChanged(newConfig);
+      Log.v(TAG, "***** onMultiWindowModeChanged: " + cordova.getActivity().isInMultiWindowMode());
+      final Intent intent = new Intent("layoutChannel");
+      Bundle b = new Bundle();
+      b.putString("action", "split_status");
+      b.putBoolean("status", cordova.getActivity().isInMultiWindowMode());
+      intent.putExtras(b);
+      LocalBroadcastManager.getInstance(cordova.getActivity()).sendBroadcastSync(intent);
+  }
 
   public void initialize(CordovaInterface cordova, CordovaWebView webView) {
     super.initialize(cordova, webView);
@@ -51,82 +59,12 @@ public class AccessibilityPlugin extends CordovaPlugin {
         }
         break;
       case "startAccessibility":
-        // clear contacts
-        _numeros = new JSONArray();
-        _returnData = new JSONArray();
-        JSONArray rawContacts = args.getJSONObject(0).getJSONArray("contacto");
-        pckName = args.getJSONObject(0).getString("packageName");
-
-        for(int i=0; i<rawContacts.length();i++){
-          // get contact
-          JSONObject contact = rawContacts.getJSONObject(i);
-
-          // flag to add _numeros variable...
-          boolean process = false;
-
-          // check if exists in cellphone
-          try {
-            if(!ContactHelper.contactExists(context.getApplicationContext(), contact.getString("numero")) ){
-              // try to create it
-              if( ContactHelper.insertContact(context.getContentResolver(), contact.getString("nombre"), contact.getString("numero")) ){
-                process = true;
-              }
-            } else {
-              process = true;
-            }
-          } catch (Exception e) {
-            e.printStackTrace();
-          }
-
-          if(process)
-            _numeros.put(contact);
-        }
-
-        Log.v(TAG, _numeros.toString());
-
-        if(_numeros.length() > 0){
-
-          // send whatsapp intent
-          whatsappIntent = new Intent();
-          whatsappIntent.setAction(Intent.ACTION_SEND);
-          whatsappIntent.setPackage(pckName);
-          whatsappIntent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP);
-          whatsappIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-
-          // attach messahe
-          if(args.getJSONObject(0).has("mensaje")){
-            try {
-              whatsappIntent.putExtra(Intent.EXTRA_TEXT, args.getJSONObject(0).getString("mensaje"));
-              whatsappIntent.setType("text/plain");
-            } catch (Exception e) {
-              e.printStackTrace();
-            }
-          }
-
-          // attach file
-          if(args.getJSONObject(0).has("attachment")){
-            try {
-              StrictMode.VmPolicy.Builder builder = new StrictMode.VmPolicy.Builder();
-              StrictMode.setVmPolicy(builder.build());
-
-              whatsappIntent.putExtra("android.intent.extra.STREAM", Uri.parse( args.getJSONObject(0).getJSONObject("attachment").getString("uri") ));
-              whatsappIntent.setType(args.getJSONObject(0).getJSONObject("attachment").getString("type"));
-            } catch (Exception e) {
-              e.printStackTrace();
-            }
-          }
-
-          super.cordova.getThreadPool().execute(new Runnable() {
-            @Override
-            public void run() {
-              callbackContext.sendPluginResult(new PluginResult(PluginResult.Status.OK, _numeros.length()));
-              // open whatsapp
-            }
-          });
-
-          openWhatsapp();
           KAccessibilityService.activated = true;
-        }
+        break;
+      case "actionAccessibility":
+        String actionName = args.getString(0);
+        KAccessibilityService service = new KAccessibilityService();
+        service.doAction(actionName);
         break;
       case "openAccessibility":
         Intent intent = new Intent(android.provider.Settings.ACTION_ACCESSIBILITY_SETTINGS);
@@ -137,14 +75,7 @@ public class AccessibilityPlugin extends CordovaPlugin {
         break;
       case "checkService":
         if(!KAccessibilityService.activated){
-
-          JSONObject rtn = new JSONObject();
-          rtn.put("sent", KAccessibilityService.sent);
-          rtn.put("returnData", _returnData);
-
-          callbackContext.sendPluginResult(new PluginResult(Status.OK, rtn));
-
-          _returnData = new JSONArray();
+          callbackContext.sendPluginResult(new PluginResult(Status.OK));
         } else {
           callbackContext.sendPluginResult(new PluginResult(Status.ERROR));
         }
@@ -153,7 +84,18 @@ public class AccessibilityPlugin extends CordovaPlugin {
         try {
           KAccessibilityService.activated = false;
           callbackContext.sendPluginResult(new PluginResult(Status.OK));
-          showDialog("Servicio detenido");
+        } catch (Exception e) {
+          e.printStackTrace();
+          callbackContext.sendPluginResult(new PluginResult(Status.ERROR));
+        }
+        break;
+      case "checkMultiWindowMode":
+        try {
+          boolean isInMultiWindowMode = false;
+          if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+            isInMultiWindowMode = cordova.getActivity().isInMultiWindowMode();
+          }
+          callbackContext.sendPluginResult(new PluginResult(Status.OK, isInMultiWindowMode));
         } catch (Exception e) {
           e.printStackTrace();
           callbackContext.sendPluginResult(new PluginResult(Status.ERROR));
@@ -205,24 +147,5 @@ public class AccessibilityPlugin extends CordovaPlugin {
     }
 
     return false;
-  }
-
-  public void openWhatsapp(){
-    super.cordova.getActivity().startActivity(this.whatsappIntent);
-  }
-
-  void showDialog(String message){
-    new AlertDialog.Builder(super.cordova.getActivity()).setTitle("V2contact dice: ")
-      .setMessage(message)
-      .setPositiveButton("Ok", new DialogInterface.OnClickListener() {
-        @Override
-        public void onClick(DialogInterface dialogInterface, int i) {
-        }
-      })
-      .show();
-  }
-
-  public void showToast(String msg){
-    Toast.makeText(super.cordova.getActivity(), msg, Toast.LENGTH_SHORT).show();
   }
 }
